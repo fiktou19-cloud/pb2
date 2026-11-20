@@ -38,9 +38,11 @@ button:active{opacity:.7}
 .sets{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .set{width:46px;height:46px;border-radius:50%;font-weight:700;font-size:17px;background:var(--card2);border:2px solid var(--line)}
 .set.done{background:var(--ok);border-color:var(--ok);color:#fff}
-.wt{margin-left:auto;display:flex;align-items:center;gap:6px}
-.wt input{width:72px;background:var(--card2);border:1px solid var(--line);color:var(--tx);border-radius:10px;padding:10px;font-size:16px;text-align:center}
+.tabs{display:flex;gap:8px;margin-bottom:14px}.tabs button{flex:1;padding:11px}.tabs .on{background:var(--acc);color:#fff;font-weight:600}
+.logrow{display:flex;gap:14px;margin-top:12px;flex-wrap:wrap}.logrow label{display:flex;align-items:center;gap:6px;color:var(--mut);font-size:13px}
+.logrow input{width:72px;background:var(--card2);border:1px solid var(--line);color:var(--tx);border-radius:10px;padding:10px;font-size:16px;text-align:center}
 .setctl{display:flex;align-items:center;gap:12px;margin-top:12px}.setctl b{min-width:20px;text-align:center;font-size:17px}.setctl button{width:44px;height:40px;padding:0;font-size:22px}
+.bigt{font-size:44px;font-weight:700;font-variant-numeric:tabular-nums;margin:2px 0 8px}.startbtn{width:100%;padding:14px;font-size:17px}
 .orange{background:var(--acc);color:#fff;font-weight:600}
 .rest{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--line);padding:12px 16px calc(12px + env(safe-area-inset-bottom));z-index:9;display:none}
 .rest.on{display:block}
@@ -56,6 +58,14 @@ input.txt{width:100%;background:var(--card2);border:1px solid var(--line);color:
 .timer{font-variant-numeric:tabular-nums;color:var(--mut);font-size:15px}
 .hide{display:none!important}
 .hint{font-size:13px;color:var(--mut)}
+.seg{display:flex;gap:8px;margin-bottom:12px}.seg button{flex:1}.seg .on{background:var(--card2);outline:2px solid var(--acc)}
+.chips{display:flex;gap:8px;overflow-x:auto;padding:4px 4px 8px;margin:0 -4px 8px}.chips button{white-space:nowrap;padding:8px 12px;font-size:14px;flex:none}.chips .on{outline:2px solid var(--acc)}
+.dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:8px;vertical-align:baseline}
+.gh{display:flex;align-items:center;margin:18px 0 8px;font-size:18px;font-weight:700}
+.legend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12px;color:var(--mut);margin-top:6px}
+.legend i{display:inline-block;width:18px;height:0;border-top:3px solid;vertical-align:middle;margin-right:6px}
+.hist{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}.hist span{font-size:12px;background:var(--card2);border-radius:8px;padding:3px 8px}
+.ax{fill:var(--mut);font-size:9px}svg{display:block}
 </style>
 </head>
 <body>
@@ -67,7 +77,7 @@ const PROGRAM={"fb": [{"name": "FULL BODY 1", "ex": [{"n": "Back squat", "w": 4,
 const WEEKS=12;
 const $=s=>document.querySelector(s);
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-let S={week:1,done:{},wt:{},sets:{},music:'',sessStart:{}};
+let S={week:1,done:{},wt:{},rp:{},sets:{},music:'',sessStart:{},sessEnd:{}};
 try{Object.assign(S,JSON.parse(localStorage.getItem('pb2')||'{}'))}catch(e){}
 const save=()=>{try{localStorage.setItem('pb2',JSON.stringify(S))}catch(e){}};
 let view={name:'home'};
@@ -75,6 +85,8 @@ const type=w=>w%2?'fb':'ppl';
 const sessions=w=>PROGRAM[type(w)];
 const key=(w,si,ei)=>`${w}|${si}|${ei}`;
 const nS=(w,si,ei)=>{const v=(S.sets||{})[key(w,si,ei)];return v==null?sessions(w)[si].ex[ei].s:v};
+const fmtT=s=>{s=Math.max(0,Math.round(s));const h=Math.floor(s/3600),m=Math.floor(s%3600/60),r=s%60;return h?h+':'+String(m).padStart(2,'0')+':'+String(r).padStart(2,'0'):m+':'+String(r).padStart(2,'0')};
+const elapsed=(w,si)=>{const k=w+'|'+si,a=S.sessStart[k];if(!a)return 0;return ((S.sessEnd&&S.sessEnd[k])||Date.now())-a};
 const fmt=s=>{s=Math.max(0,Math.round(s));return Math.floor(s/60)+':'+String(s%60).padStart(2,'0')};
 
 /* audio */
@@ -93,6 +105,7 @@ document.addEventListener('visibilitychange',()=>{if(document.visibilityState===
 let restEnd=0,restLab='',restWarned=0,restFired=true;
 function startRest(sec,lab){if(sec<=0)return;restEnd=Date.now()+sec*1000;restLab=lab;restFired=false;restWarned=0;$('#rest').classList.add('on');$('#rest').classList.remove('end');tick()}
 function tick(){
+  if(view.name==='session'){const t=fmtT(elapsed(view.w,view.si)/1000);['#sessTimer','#bigTimer'].forEach(i=>{const el=$(i);if(el)el.textContent=t})}
   const el=$('#rest');if(!el.classList.contains('on'))return;
   const left=(restEnd-Date.now())/1000;
   $('#restLab').textContent=restLab;
@@ -100,7 +113,6 @@ function tick(){
     const c=Math.ceil(left);if(c<=3&&restWarned!==c){restWarned=c;beep(660,.08,.2)}}
   else{$('#restBig').textContent='GO !';el.classList.add('end');
     if(!restFired){restFired=true;alarm();setTimeout(()=>{if(restEnd&&Date.now()>=restEnd+4000)hideRest()},4500)}}
-  const st=$('#sessTimer');if(st&&view.name==='session'){const t=S.sessStart[view.w+'|'+view.si];st.textContent=t?fmt((Date.now()-t)/1000):'0:00'}
 }
 function hideRest(){$('#rest').classList.remove('on');restEnd=0}
 $('#rSkip').onclick=hideRest;
@@ -114,6 +126,91 @@ function closeSheet(){$('#sheet').classList.remove('on')}
 $('#sheet').addEventListener('click',e=>{if(e.target.id==='sheet')closeSheet()});
 
 /* helpers */
+
+/* progression */
+const GROUPS={Quads:'#ff8a3d',Ischio:'#e5484d',Fessiers:'#ff6fb5',Pecs:'#4c8dff',Dos:'#2ec4b6','Épaules':'#f5c518',Triceps:'#a77bff',Biceps:'#3ddc84',Mollets:'#c49a6c','Trapèzes':'#8fa3b8',Abdos:'#e8e8e8'};
+const groupOf=m=>{const t=String(m).split('/')[0].trim();if(t.startsWith('Delts')||t==='Épaules')return'Épaules';return GROUPS[t]?t:'Autre'};
+const gcol=g=>GROUPS[g]||'#9aa0ab';
+const normN=n=>n.replace(/^[A-E]\d:\s*/,'');
+const DASH=['','6 3','2 3','8 3 2 3','1 4'];
+function shade(hex,i,n){
+  if(n<2)return hex;
+  const r=parseInt(hex.slice(1,3),16)/255,g=parseInt(hex.slice(3,5),16)/255,b=parseInt(hex.slice(5,7),16)/255;
+  const mx=Math.max(r,g,b),mn=Math.min(r,g,b),d=mx-mn;let h=0;
+  if(d){h=mx===r?((g-b)/d)%6:mx===g?(b-r)/d+2:(r-g)/d+4;h*=60;if(h<0)h+=360}
+  const l=(mx+mn)/2,sat=d?d/(1-Math.abs(2*l-1)):0;
+  const L=76-i*(38/(n-1));
+  return `hsl(${Math.round(h)} ${Math.round(Math.max(sat*100,25))}% ${Math.round(L)}%)`;
+}
+function hist(){
+  const H={};
+  for(let w=1;w<=WEEKS;w++)sessions(w).forEach((ss,si)=>ss.ex.forEach((e,ei)=>{
+    const k=key(w,si,ei),kg=parseFloat(String(S.wt[k]||'').replace(',','.')),rp=parseFloat(S.rp[k]);
+    if(!(kg>0)&&!(rp>0))return;
+    const nm=normN(e.n),h=H[nm]=H[nm]||{name:nm,group:groupOf(e.m),weeks:{}};
+    const c=h.weeks[w]=h.weeks[w]||{kg:0,reps:0};
+    if(kg>c.kg)c.kg=kg;if(rp>c.reps)c.reps=rp;
+  }));
+  return H;
+}
+function lastFor(H,name,w){const h=H[normN(name)];if(!h)return null;let b=null;for(let x=1;x<w;x++)if(h.weeks[x])b=h.weeks[x];return b}
+const fnum=v=>Number.isInteger(v)?String(v):v.toFixed(1);
+function chart(series,metric){
+  const W=320,Ht=150,l=34,r=10,t=8,b=20;
+  const vals=[];series.forEach(s=>Object.values(s.pts).forEach(v=>{if(v>0)vals.push(v)}));
+  if(!vals.length)return'';
+  let mn=Math.min(...vals),mx=Math.max(...vals);
+  if(mn===mx){mn=Math.max(0,mn-1);mx=mx+1}
+  const pd=(mx-mn)*.15;mn=Math.max(0,mn-pd);mx+=pd;
+  const x=w=>l+(w-1)*(W-l-r)/(WEEKS-1),y=v=>t+(Ht-t-b)*(1-(v-mn)/(mx-mn));
+  let o=`<svg viewBox="0 0 ${W} ${Ht}" width="100%" role="img" aria-label="Évolution ${metric==='kg'?'des charges':'des reps'}">`;
+  for(let i=0;i<4;i++){const v=mn+(mx-mn)*i/3,yy=y(v);o+=`<line x1="${l}" x2="${W-r}" y1="${yy}" y2="${yy}" stroke="var(--line)" stroke-width="1"/><text class="ax" x="${l-4}" y="${yy+3}" text-anchor="end">${(mx-mn)<10?v.toFixed(1):Math.round(v)}</text>`}
+  for(let w=1;w<=WEEKS;w++)o+=`<text class="ax" x="${x(w)}" y="${Ht-6}" text-anchor="middle">S${w}</text>`;
+  series.forEach((s,si)=>{
+    const ws=Object.keys(s.pts).map(Number).filter(w=>s.pts[w]>0).sort((a,b)=>a-b);
+    if(!ws.length)return;
+    if(ws.length>1)o+=`<polyline fill="none" stroke="${s.color}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" ${s.dash?`stroke-dasharray="${s.dash}"`:''} points="${ws.map(w=>x(w)+','+y(s.pts[w])).join(' ')}"/>`;
+    ws.forEach(w=>{o+=`<circle cx="${x(w)}" cy="${y(s.pts[w])}" r="3.6" fill="${s.color}" stroke="var(--card)" stroke-width="1.2"/>`});
+  });
+  return o+'</svg>';
+}
+const tabs=a=>`<div class="tabs"><button class="${a==='home'?'on':''}" onclick="goHome()">Séances</button><button class="${a==='prog'?'on':''}" onclick="goProg()">📈 Progression</button></div>`;
+function goHome(){view={name:'home'};hideRest();home()}
+function goProg(){view={name:'prog',metric:view.metric||'kg',group:'all'};hideRest();window.scrollTo(0,0);prog()}
+function setMetric(m){view.metric=m;prog()}
+function setGroup(g){view.group=g;prog()}
+function prog(){
+  const m=view.metric||'kg',H=hist(),all=Object.values(H);
+  const groups=Object.keys(GROUPS).concat(['Autre']).filter(g=>all.some(h=>h.group===g));
+  if(view.group!=='all'&&!groups.includes(view.group))view.group='all';
+  const unit=m==='kg'?' kg':' reps';
+  let body='';
+  if(!all.length)body=`<div class="card"><p style="margin:0">Pas encore de données.</p><p class="hint">Dans une séance, note la <b>charge</b> et les <b>reps</b> de ta série principale pour chaque exercice. Tes courbes apparaîtront ici, semaine après semaine.</p></div>`;
+  else{
+    const show=view.group==='all'?groups:[view.group];
+    show.forEach(g=>{
+      const ex=all.filter(h=>h.group===g&&Object.values(h.weeks).some(c=>c[m==='kg'?'kg':'reps']>0)).sort((a,b)=>a.name.localeCompare(b.name));
+      if(!ex.length)return;
+      const col=gcol(g),n=ex.length;
+      const ser=ex.map((h,i)=>({label:h.name,color:shade(col,i,n),dash:n>1?DASH[i%DASH.length]:'',pts:Object.fromEntries(Object.entries(h.weeks).map(([w,c])=>[w,c[m==='kg'?'kg':'reps']]))}));
+      body+=`<div class="gh"><span class="dot" style="background:${col}"></span>${esc(g)}</div>`;
+      if(n>1)body+=`<div class="card">${chart(ser,m)}<div class="legend">${ser.map(s=>`<span><i style="border-color:${s.color};${s.dash?'border-top-style:dashed':''}"></i>${esc(s.label)}</span>`).join('')}</div></div>`;
+      ex.forEach((h,i)=>{
+        const wk=Object.keys(h.weeks).map(Number).sort((a,b)=>a-b).filter(w=>h.weeks[w][m==='kg'?'kg':'reps']>0);
+        const f=h.weeks[wk[0]][m==='kg'?'kg':'reps'],lst=h.weeks[wk[wk.length-1]][m==='kg'?'kg':'reps'],d=lst-f;
+        const best=Math.max(...wk.map(w=>h.weeks[w][m==='kg'?'kg':'reps']));
+        body+=`<div class="card"><div style="font-weight:600"><span class="dot" style="background:${ser[i].color}"></span>${esc(h.name)}</div>
+        <div class="hint" style="margin:2px 0 6px">${wk.length>1?`S${wk[0]} ${fnum(f)} → S${wk[wk.length-1]} ${fnum(lst)}${unit} · <b style="color:${d>=0?'var(--ok)':'var(--acc)'}">${d>=0?'+':''}${fnum(d)}</b>`:`S${wk[0]} : ${fnum(f)}${unit}`} · record ${fnum(best)}${unit}</div>
+        ${chart([{...ser[i],dash:''}],m)}
+        <div class="hist">${Object.keys(h.weeks).map(Number).sort((a,b)=>a-b).map(w=>{const c=h.weeks[w];return `<span>S${w} · ${c.kg?fnum(c.kg)+' kg':'—'} × ${c.reps?fnum(c.reps):'—'}</span>`}).join('')}</div></div>`;
+      });
+    });
+  }
+  $('#app').innerHTML=`<div class="top"><h1>PB2 Powerbuilding</h1><button onclick="openMusic()">🎵</button><button onclick="openTimer()">⏱</button></div>${tabs('prog')}
+  <div class="seg"><button class="${m==='kg'?'on':''}" onclick="setMetric('kg')">Charges (kg)</button><button class="${m==='reps'?'on':''}" onclick="setMetric('reps')">Répétitions</button></div>
+  ${all.length?`<div class="chips"><button class="${view.group==='all'?'on':''}" onclick="setGroup('all')">Tous</button>${groups.map(g=>`<button class="${view.group===g?'on':''}" onclick="setGroup('${g}')"><span class="dot" style="background:${gcol(g)};margin-right:6px"></span>${esc(g)}</button>`).join('')}</div>`:''}
+  ${body}`;
+}
 function progress(w,si){const ss=sessions(w)[si];let t=0,d=0;ss.ex.forEach((e,ei)=>{for(let k=0;k<nS(w,si,ei);k++){t++;if(S.done[key(w,si,ei)+'|'+k])d++}});return t?Math.round(d/t*100):0}
 function musicOpen(){
   if(!S.music){openMusic();return}
@@ -126,40 +223,51 @@ function openMusic(){openSheet(`<h2 style="margin-top:0">Ma playlist YouTube Mus
 <p class="hint">Astuce : lance la musique d'abord, puis reviens ici. Elle continue en arrière-plan.</p>`)}
 function openTimer(){openSheet(`<h2 style="margin-top:0">Minuteur</h2><div class="grid">${[30,45,60,90,120,150,180,240].map(s=>`<button onclick="closeSheet();startRest(${s},'Minuteur')">${fmt(s)}</button>`).join('')}</div><button onclick="closeSheet()" style="width:100%">Fermer</button>`)}
 function reset(){openSheet(`<h2 style="margin-top:0">Semaine ${S.week}</h2><p>Remettre à zéro les séries cochées de cette semaine ?</p><div style="display:flex;gap:8px"><button class="orange" style="flex:1" onclick="resetWeek()">Oui, remettre à zéro</button><button onclick="closeSheet()">Annuler</button></div>`)}
-function resetWeek(){const p=S.week+'|';Object.keys(S.done).forEach(k=>{if(k.startsWith(p))delete S.done[k]});Object.keys(S.sessStart).forEach(k=>{if(k.startsWith(p))delete S.sessStart[k]});Object.keys(S.sets||{}).forEach(k=>{if(k.startsWith(p))delete S.sets[k]});save();closeSheet();render()}
+function resetWeek(){const p=S.week+'|';Object.keys(S.done).forEach(k=>{if(k.startsWith(p))delete S.done[k]});Object.keys(S.sessStart).forEach(k=>{if(k.startsWith(p))delete S.sessStart[k]});Object.keys(S.sessEnd||{}).forEach(k=>{if(k.startsWith(p))delete S.sessEnd[k]});Object.keys(S.sets||{}).forEach(k=>{if(k.startsWith(p))delete S.sets[k]});save();closeSheet();render()}
 
 /* views */
-function render(){view.name==='home'?home():session()}
+function render(){view.name==='home'?home():view.name==='prog'?prog():session()}
 function home(){
   const w=S.week,ss=sessions(w);
   $('#app').innerHTML=`<div class="top"><h1>PB2 Powerbuilding</h1><button onclick="openMusic()">🎵</button><button onclick="openTimer()">⏱</button></div>
+  ${tabs('home')}
   <div class="weeknav"><button onclick="setWeek(${w-1})" ${w<=1?'disabled':''}>‹</button>
   <div class="w"><b>Semaine ${w}</b><span class="sub">${type(w)==='fb'?'Full Body':'Push / Pull / Legs'}${w===8?' · semi-deload : évite l\'échec, charges plus légères':''}</span></div>
   <button onclick="setWeek(${w+1})" ${w>=WEEKS?'disabled':''}>›</button></div>
-  ${ss.map((s,i)=>{const p=progress(w,i);return `<button class="sess" onclick="openSession(${i})"><div class="t"><b>${esc(s.name)}</b><span class="sub">${s.ex.length} exercices</span><div class="bar"><i style="width:${p}%"></i></div></div><span class="pct">${p}%</span></button>`}).join('')}
+  ${ss.map((s,i)=>{const p=progress(w,i);return `<button class="sess" onclick="openSession(${i})"><div class="t"><b>${esc(s.name)}</b><span class="sub">${s.ex.length} exercices${(S.sessEnd||{})[w+'|'+i]?' · durée '+fmtT(elapsed(w,i)/1000):''}</span><div class="bar"><i style="width:${p}%"></i></div></div><span class="pct">${p}%</span></button>`}).join('')}
   <p style="text-align:center"><button onclick="reset()" class="sub">Remettre la semaine à zéro</button></p>`;
 }
 function setWeek(w){S.week=Math.min(WEEKS,Math.max(1,w));save();home()}
 function openSession(si){view={name:'session',w:S.week,si};keepAwake();window.scrollTo(0,0);session()}
 function session(){
   const {w,si}=view,s=sessions(w)[si];
-  const started=S.sessStart[w+'|'+si];
-  $('#app').innerHTML=`<div class="top"><button onclick="back()">‹</button><h1>${esc(s.name)}<div class="timer">Sem. ${w} · <span id="sessTimer">${started?fmt((Date.now()-started)/1000):'0:00'}</span></div></h1><button onclick="musicOpen()">🎵</button><button onclick="openTimer()">⏱</button></div>
+  const H=hist(),sk=w+'|'+si,started=S.sessStart[sk],ended=(S.sessEnd||{})[sk];
+  const doneN=Object.keys(S.done).filter(k=>k.startsWith(w+'|'+si+'|')).length;
+  const banner=!started?`<div class="card"><button class="orange startbtn" onclick="startSess()">▶ Démarrer la séance</button></div>`
+   :ended?`<div class="card" style="text-align:center"><div class="hint">Séance terminée</div><div class="bigt" id="bigTimer">${fmtT(elapsed(w,si)/1000)}</div><div class="hint">${doneN} ${doneN>1?"séries cochées":"série cochée"}</div><div style="display:flex;gap:8px;margin-top:12px"><button style="flex:1" onclick="resumeSess()">Reprendre</button><button style="flex:1" onclick="resetSess()">Remettre à zéro</button></div></div>`
+   :`<div class="card" style="text-align:center"><div class="hint">Séance en cours</div><div class="bigt" id="bigTimer">${fmtT(elapsed(w,si)/1000)}</div><button class="orange startbtn" onclick="endSess()">⏹ Terminer la séance</button></div>`;
+  $('#app').innerHTML=`<div class="top"><button onclick="back()">‹</button><h1>${esc(s.name)}<div class="timer">Sem. ${w} · <span id="sessTimer">${fmtT(elapsed(w,si)/1000)}</span></div></h1><button onclick="musicOpen()">🎵</button><button onclick="openTimer()">⏱</button></div>
+  ${banner}
   ${s.ex.map((e,ei)=>{
-    const last=S.wt[`${w-2>0&&type(w-2)===type(w)?w-2:0}|${si}|${ei}`]||'';
-    const cur=S.wt[key(w,si,ei)]||'';
+    const lf=lastFor(H,e.n,w)||{};
+    const cur=S.wt[key(w,si,ei)]||'',curR=S.rp[key(w,si,ei)]||'';
     return `<div class="card ex"><h3>${esc(e.n)}<span class="chip">${esc(e.m)}</span></h3>
     <div class="meta"><span>Éch. ${e.w}</span><span>Reps ${esc(e.r)}</span><span>RPE ${esc(e.rpe)}</span><span>Repos ${esc(e.rest)}</span>${e.each?'<span>par côté</span>':''}</div>
     ${e.note?`<p class="note">${esc(e.note)}</p>`:''}
     <div class="sets">${Array.from({length:nS(w,si,ei)},(_,k)=>`<button class="set ${S.done[key(w,si,ei)+'|'+k]?'done':''}" onclick="toggle(${ei},${k})">${k+1}</button>`).join('')}
-    <div class="wt"><input type="number" inputmode="decimal" placeholder="${esc(last||'kg')}" value="${esc(cur)}" onchange="setWt(${ei},this.value)"><span class="hint">kg</span></div></div>
+    </div>
+    <div class="logrow"><label>Charge <input type="number" inputmode="decimal" placeholder="${esc(lf.kg||'kg')}" value="${esc(cur)}" onchange="setWt(${ei},this.value)"> kg</label><label>Reps <input type="number" inputmode="numeric" placeholder="${esc(lf.reps||'reps')}" value="${esc(curR)}" onchange="setRp(${ei},this.value)"></label></div>
     <div class="setctl"><span class="hint">Séries</span><button onclick="chSets(${ei},-1)">−</button><b>${nS(w,si,ei)}</b><button onclick="chSets(${ei},1)">+</button></div></div>`}).join('')}`;
 }
+function startSess(){const k=view.w+'|'+view.si;S.sessStart[k]=Date.now();delete S.sessEnd[k];save();keepAwake();session()}
+function endSess(){const k=view.w+'|'+view.si;S.sessEnd[k]=Date.now();hideRest();save();session()}
+function resumeSess(){const k=view.w+'|'+view.si,d=Date.now()-S.sessEnd[k];S.sessStart[k]+=d;delete S.sessEnd[k];save();session()}
+function resetSess(){const k=view.w+'|'+view.si;delete S.sessStart[k];delete S.sessEnd[k];save();session()}
 function back(){view={name:'home'};hideRest();home()}
 function toggle(ei,k){
   const {w,si}=view,e=sessions(w)[si].ex[ei],kk=key(w,si,ei)+'|'+k;
   if(S.done[kk]){delete S.done[kk]}
-  else{S.done[kk]=1;if(!S.sessStart[w+'|'+si])S.sessStart[w+'|'+si]=Date.now();
+  else{S.done[kk]=1;
     const n=nS(w,si,ei);const last=Array.from({length:n}).every((_,j)=>S.done[key(w,si,ei)+'|'+j]);
     startRest(e.restSec,last?'Repos · exo suivant':`Repos · série ${k+2}/${n}`)}
   save();session()
@@ -171,6 +279,7 @@ function chSets(ei,d){
   S.sets[kk]=nv;save();session()
 }
 function setWt(ei,v){S.wt[key(view.w,view.si,ei)]=v;save()}
+function setRp(ei,v){S.rp[key(view.w,view.si,ei)]=v;save()}
 render();
 if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
 </script>
